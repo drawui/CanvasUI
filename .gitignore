@@ -1,0 +1,7 @@
+Debug/
+Release/
+.svn/
+.gta/
+*.ncb
+*.opt
+*.plg
