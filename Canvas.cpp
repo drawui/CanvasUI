@@ -31,13 +31,14 @@ void CCanvas::Clear()
 
 }
 
-void CCanvas::Draw(HDC hDC, const RECT &rcPaint)
+void CCanvas::Draw(HDC hDC, const RECT &rcPaint, const POINT &ptOffset)
 {
 	RECT rcBackground;
 
 	::CopyRect(&rcBackground, &rcPaint);
+	::OffsetRect(&rcBackground, -ptOffset.x, -ptOffset.y);
 	::FillRect(hDC, &rcBackground, (HBRUSH)::GetStockObject(BLACK_BRUSH));
 
-	m_GdiPlus.Draw(hDC, rcPaint);
+	m_GdiPlus.Draw(hDC, rcPaint, ptOffset);
 
 }

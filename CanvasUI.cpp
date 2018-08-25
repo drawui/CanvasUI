@@ -12,6 +12,12 @@ HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];								// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];								// The title bar text
 CCanvas g_Canvas;
+SIZE g_sizeOldTotal = { 0, 0 };
+SIZE g_sizeOldClient = { 0, 0 };
+
+#if (_WIN32_WINNT >= 0x400)
+int g_iMouseWheel = 0;
+#endif
 
 // Foward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
@@ -113,7 +119,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
    hInst = hInstance; // Store instance handle in our global variable
 
-   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW | WS_HSCROLL | WS_VSCROLL,
+      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
    if (!hWnd)
    {
@@ -180,8 +187,216 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			rcCanvas.right = rcCanvas.left + 900;
 			rcCanvas.top = 20;
 			rcCanvas.bottom = rcCanvas.top + 400;
-			g_Canvas.Draw(hdc, rcCanvas);
+			POINT ptOffset;
+			ptOffset.x = GetScrollPos(hWnd, SB_HORZ);
+			ptOffset.y = GetScrollPos(hWnd, SB_VERT);
+#if (_WIN32_WINNT >= 0x400)
+			if( g_iMouseWheel != 0 )
+			{
+				POINT ptVRange = { 0, g_sizeOldTotal.cy };
+				int iVPage = g_sizeOldClient.cy;
+
+				if( ptVRange.y - ptVRange.x > iVPage )
+				{
+					int iVStep = 16;
+
+					if( iVStep > 0 )
+					{
+						ptOffset.y = min((ptVRange.y - iVPage + iVStep) / iVStep * iVStep,
+							max(ptVRange.x / iVStep * iVStep, (ptOffset.y + iVStep * g_iMouseWheel) / iVStep * iVStep));
+						SetScrollPos(hWnd, SB_VERT, ptOffset.y, TRUE);
+					}
+				}
+				g_iMouseWheel = 0;
+			}
+#endif
+			g_Canvas.Draw(hdc, rcCanvas, ptOffset);
 			EndPaint(hWnd, &ps);
+			{
+				SIZE sizeTotal = { rcCanvas.right - rcCanvas.left, rcCanvas.bottom - rcCanvas.top + 40 };
+				SCROLLINFO sinfo;
+
+				memset(&sinfo, 0, sizeof(sinfo));
+				if( (sizeTotal.cx != g_sizeOldTotal.cx) ||
+					(rt.right - rt.left != g_sizeOldClient.cx) )
+				{
+					g_sizeOldTotal.cx = sizeTotal.cx;
+					g_sizeOldClient.cx = rt.right - rt.left;
+					sinfo.cbSize = sizeof(sinfo);
+					if( g_sizeOldTotal.cx < rt.right - rt.left )
+					{
+						SetScrollPos(hWnd, SB_HORZ, 0, TRUE);
+						EnableScrollBar(hWnd, SB_HORZ, ESB_DISABLE_BOTH);
+					}
+					else
+					{
+						EnableScrollBar(hWnd, SB_HORZ, ESB_ENABLE_BOTH);
+						sinfo.fMask = SIF_PAGE | SIF_RANGE | SIF_POS;
+						sinfo.nMin = 0;
+						sinfo.nMax = g_sizeOldTotal.cx;
+						sinfo.nPage = g_sizeOldClient.cx;
+						sinfo.nPos = ptOffset.x;
+						SetScrollInfo(hWnd, SB_HORZ, &sinfo, TRUE);
+					}
+				}
+				memset(&sinfo, 0, sizeof(sinfo));
+				if( (sizeTotal.cy != g_sizeOldTotal.cy) ||
+					(rt.bottom - rt.top != g_sizeOldClient.cy) )
+				{
+					g_sizeOldTotal.cy = sizeTotal.cy;
+					g_sizeOldClient.cy = rt.bottom - rt.top;
+					sinfo.cbSize = sizeof(sinfo);
+					if( g_sizeOldTotal.cy < rt.bottom - rt.top )
+					{
+						SetScrollPos(hWnd, SB_VERT, 0, TRUE);
+						EnableScrollBar(hWnd, SB_VERT, ESB_DISABLE_BOTH);
+					}
+					else
+					{
+						EnableScrollBar(hWnd, SB_VERT, ESB_ENABLE_BOTH);
+						sinfo.fMask = SIF_PAGE | SIF_RANGE | SIF_POS;
+						sinfo.nMin = 0;
+						sinfo.nMax = g_sizeOldTotal.cy;
+						sinfo.nPage = g_sizeOldClient.cy;
+						sinfo.nPos = ptOffset.y;
+						SetScrollInfo(hWnd, SB_VERT, &sinfo, TRUE);
+					}
+				}
+			}
+			break;
+#if (_WIN32_WINNT >= 0x400)
+		case WM_MOUSEWHEEL:
+			{
+				short sDelta = (short)HIWORD(wParam);
+
+				if( sDelta > 0 )	// ио╧Ж
+				{
+					g_iMouseWheel--;
+				}
+				else
+				{
+					g_iMouseWheel++;
+				}
+				InvalidateRect(hWnd, NULL, FALSE);
+			}
+			break;
+#endif
+		case WM_HSCROLL:
+			{
+				SCROLLINFO si;
+				int xCurrentScroll = GetScrollPos(hWnd, SB_HORZ);
+				int xDelta;     // xDelta = new_pos - current_pos
+				int xNewPos;    // new position
+				int yDelta = 0;
+
+				switch ((short)LOWORD(wParam))
+				{
+				case SB_PAGEUP:
+					xNewPos = xCurrentScroll - g_sizeOldClient.cx;
+					break;
+				// User clicked the shaft right of the scroll box.
+				case SB_PAGEDOWN:
+					xNewPos = xCurrentScroll + g_sizeOldClient.cx;
+					break;
+				// User clicked the left arrow.
+				case SB_LINEUP:
+					xNewPos = xCurrentScroll - 16;
+					break;
+				// User clicked the right arrow.
+				case SB_LINEDOWN:
+					xNewPos = xCurrentScroll + 16;
+					break;
+				// User dragged the scroll box.
+				case SB_THUMBPOSITION:
+				case SB_THUMBTRACK:
+					xNewPos = HIWORD(wParam);
+					break;
+				default:
+					xNewPos = xCurrentScroll;
+				}
+
+				// New position must be between 0 and the screen width.
+				xNewPos = max(0, xNewPos);
+				xNewPos = min(g_sizeOldTotal.cx, xNewPos);
+				// If the current position does not change, do not scroll.
+				if (xNewPos == xCurrentScroll)
+					break;
+				// Determine the amount scrolled (in pixels).
+				xDelta = xNewPos - xCurrentScroll;
+				// Reset the current scroll position.
+				xCurrentScroll = xNewPos;
+				// Scroll the window. (The system repaints most of the
+				// client area when ScrollWindowEx is called; however, it is
+				// necessary to call UpdateWindow in order to repaint the
+				// rectangle of pixels that were invalidated.)
+				ScrollWindowEx(hWnd, xDelta, yDelta, (CONST RECT *) NULL,
+					(CONST RECT *) NULL, (HRGN) NULL, (LPRECT) NULL, 0);
+				InvalidateRect(hWnd, NULL, FALSE);
+				// Reset the scroll bar.
+				si.cbSize = sizeof(si);
+				si.fMask  = SIF_POS;
+				si.nPos   = xCurrentScroll;
+				SetScrollInfo(hWnd, SB_HORZ, &si, TRUE);
+			}
+			break;
+		case WM_VSCROLL:
+			{
+				SCROLLINFO si;
+				int yCurrentScroll = GetScrollPos(hWnd, SB_VERT);
+				int xDelta = 0;
+				int yDelta;     // yDelta = new_pos - current_pos
+				int yNewPos;    // new position
+
+				switch ((short)LOWORD(wParam))
+				{
+				// User clicked the shaft above the scroll box.
+				case SB_PAGEUP:
+					yNewPos = yCurrentScroll - g_sizeOldClient.cy;
+					break;
+				// User clicked the shaft below the scroll box.
+				case SB_PAGEDOWN:
+					yNewPos = yCurrentScroll + g_sizeOldClient.cy;
+					break;
+				// User clicked the top arrow.
+				case SB_LINEUP:
+					yNewPos = yCurrentScroll - 16;
+					break;
+				// User clicked the bottom arrow.
+				case SB_LINEDOWN:
+					yNewPos = yCurrentScroll + 16;
+					break;
+				// User dragged the scroll box.
+				case SB_THUMBPOSITION:
+				case SB_THUMBTRACK:
+					yNewPos = HIWORD(wParam);
+					break;
+				default:
+					yNewPos = yCurrentScroll;
+				}
+
+				// New position must be between 0 and the screen height.
+				yNewPos = max(0, yNewPos);
+				yNewPos = min(g_sizeOldTotal.cy, yNewPos);
+				// If the current position does not change, do not scroll.
+				if (yNewPos == yCurrentScroll)
+					break;
+				// Determine the amount scrolled (in pixels).
+				yDelta = yNewPos - yCurrentScroll;
+				// Reset the current scroll position.
+				yCurrentScroll = yNewPos;
+				// Scroll the window. (The system repaints most of the
+				// client area when ScrollWindowEx is called; however, it is
+				// necessary to call UpdateWindow in order to repaint the
+				// rectangle of pixels that were invalidated.)
+				ScrollWindowEx(hWnd, xDelta, yDelta, (CONST RECT *) NULL,
+					(CONST RECT *) NULL, (HRGN) NULL, (LPRECT) NULL, 0);
+				InvalidateRect(hWnd, NULL, FALSE);
+				// Reset the scroll bar.
+				si.cbSize = sizeof(si);
+				si.fMask  = SIF_POS;
+				si.nPos   = yCurrentScroll;
+				SetScrollInfo(hWnd, SB_VERT, &si, TRUE);
+			}
 			break;
 		case WM_DESTROY:
 			PostQuitMessage(0);

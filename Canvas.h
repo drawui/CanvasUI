@@ -20,7 +20,7 @@ public:
 	BOOL AddImage(LPCSTR lpszFilePath, const RECT& rcImage, int iWidth, int iHeight);
 	void Clear();
 
-	void Draw(HDC hDC, const RECT& rcPaint);
+	void Draw(HDC hDC, const RECT& rcPaint, const POINT& ptOffset);
 
 protected:
 	CGdiPlus m_GdiPlus;

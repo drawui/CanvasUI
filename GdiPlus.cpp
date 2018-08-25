@@ -127,7 +127,7 @@ void CGdiPlus::Clear()
 
 }
 
-void CGdiPlus::Draw(HDC hDC, const RECT &rcPaint)
+void CGdiPlus::Draw(HDC hDC, const RECT &rcPaint, const POINT &ptOffset)
 {
 	if( !s_bGdiPlusInitialized )
 		return;
@@ -140,7 +140,7 @@ void CGdiPlus::Draw(HDC hDC, const RECT &rcPaint)
 		const struct _tagImage& Image = m_vImages[nImage];
 
 		GdipDrawImageRectRect(pGraphics, Image.pImage,
-			(Gdiplus::REAL)(rcPaint.left + Image.rcImage.left), (Gdiplus::REAL)(rcPaint.top + Image.rcImage.top),
+			(Gdiplus::REAL)(rcPaint.left + Image.rcImage.left - ptOffset.x), (Gdiplus::REAL)(rcPaint.top + Image.rcImage.top - ptOffset.y),
 			(Gdiplus::REAL)(Image.rcImage.right - Image.rcImage.left), (Gdiplus::REAL)(Image.rcImage.bottom - Image.rcImage.top),
 			(Gdiplus::REAL)0.0, (Gdiplus::REAL)0.0, (Gdiplus::REAL)Image.iWidth, (Gdiplus::REAL)Image.iHeight,
 			UnitPixel, NULL, NULL, NULL);
