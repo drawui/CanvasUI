@@ -14,6 +14,7 @@ TCHAR szWindowClass[MAX_LOADSTRING];								// The title bar text
 CCanvas g_Canvas;
 SIZE g_sizeOldTotal = { 0, 0 };
 SIZE g_sizeOldClient = { 0, 0 };
+HBITMAP g_hbmMem = NULL;
 
 #if (_WIN32_WINNT >= 0x400)
 int g_iMouseWheel = 0;
@@ -182,7 +183,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			RECT rt;
 			RECT rcCanvas;
 			GetClientRect(hWnd, &rt);
-			::FillRect(hdc, &rt, (HBRUSH)::GetStockObject(WHITE_BRUSH));
+			HDC hdcMem;
+			HBITMAP hbmOld;
+			hdcMem = ::CreateCompatibleDC(ps.hdc);
+			hbmOld = NULL;
+			if( (g_sizeOldClient.cx != (rt.right - rt.left)) ||
+				(g_sizeOldClient.cy != (rt.bottom - rt.top)) )
+			{
+				DeleteObject(g_hbmMem);
+				g_hbmMem = NULL;
+			}
+			if( g_hbmMem == NULL )
+			{
+				g_hbmMem = ::CreateCompatibleBitmap(hdc, rt.right - rt.left, rt.bottom - rt.top);
+			}
+			hbmOld = (HBITMAP)::SelectObject(hdcMem, g_hbmMem);
+			::FillRect(hdcMem, &rt, (HBRUSH)::GetStockObject(WHITE_BRUSH));
 			rcCanvas.left = max(0, (rt.left + rt.right) / 2 - 450);
 			rcCanvas.right = rcCanvas.left + 900;
 			rcCanvas.top = 20;
@@ -210,7 +226,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				g_iMouseWheel = 0;
 			}
 #endif
-			g_Canvas.Draw(hdc, rcCanvas, ptOffset);
+			g_Canvas.Draw(hdcMem, rcCanvas, ptOffset);
+			::BitBlt(hdc, rt.left, rt.top, rt.right - rt.left, rt.bottom - rt.top,
+				hdcMem, rt.left, rt.top, SRCCOPY);
+			::SelectObject(hdcMem, hbmOld);
+			::DeleteDC(hdcMem);
 			EndPaint(hWnd, &ps);
 			{
 				SIZE sizeTotal = { rcCanvas.right - rcCanvas.left, rcCanvas.bottom - rcCanvas.top + 40 };
@@ -264,6 +284,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 			}
 			break;
+		case WM_ERASEBKGND:
+			return 0;
 #if (_WIN32_WINNT >= 0x400)
 		case WM_MOUSEWHEEL:
 			{
@@ -400,6 +422,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case WM_DESTROY:
 			PostQuitMessage(0);
+			if( g_hbmMem != NULL )
+				DeleteObject(g_hbmMem);
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
