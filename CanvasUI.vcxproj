@@ -154,7 +154,9 @@
   <ItemGroup>
     <CustomBuild Include="CanvasUI.ico" />
     <CustomBuild Include="small.ico" />
-    <CustomBuild Include="ReadMe.txt" />
+    <CustomBuild Include="Readme.md">
+      <FileType>Document</FileType>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

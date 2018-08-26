@@ -148,7 +148,7 @@ SOURCE=.\small.ico
 # End Group
 # Begin Source File
 
-SOURCE=.\ReadMe.txt
+SOURCE=.\Readme.md
 # End Source File
 # End Target
 # End Project
